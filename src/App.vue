@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref } from "vue";
 import {
   createState,
+  correctRound,
   finishSession,
   KIND_LABELS,
   money,
@@ -21,8 +22,10 @@ import HistoryView from "./components/HistoryView.vue";
 import RoundList from "./components/RoundList.vue";
 import SessionSetup from "./components/SessionSetup.vue";
 import StatsView from "./components/StatsView.vue";
+import RoundCorrection from "./components/RoundCorrection.vue";
+import SettlementList from "./components/SettlementList.vue";
 
-const { state, error, blocked, stale, saving, lastSaved, transact, stats } =
+const { state, error, blocked, stale, saving, lastSaved, transact } =
   useRecorder();
 const view = ref("score");
 const setupEpoch = ref(0);
@@ -31,7 +34,39 @@ function reloadPage() {
   window.location.reload();
 }
 const dialog = ref(null);
-const detail = ref(null);
+const dateFilter = ref({ preset: "all", from: "", to: "" });
+const detailId = ref(null);
+const detailPane = ref("rounds");
+const detail = computed(() => {
+  const index = state.value.sessions.findIndex(
+    (session) => session.id === detailId.value,
+  );
+  return index < 0
+    ? null
+    : { ...state.value.sessions[index], number: index + 1 };
+});
+const editing = ref(null);
+const editKind = ref("discard");
+const editWinner = ref("p1");
+const editSession = computed(() =>
+  state.value.active?.id === editing.value?.sessionId
+    ? state.value.active
+    : state.value.sessions.find(
+        (session) => session.id === editing.value?.sessionId,
+      ),
+);
+const editRound = computed(() =>
+  editSession.value?.rounds.find(
+    (round) => round.id === editing.value?.roundId,
+  ),
+);
+const editChanged = computed(
+  () =>
+    editRound.value &&
+    (editKind.value !== editRound.value.kind ||
+      (editKind.value === "draw" ? null : editWinner.value) !==
+        editRound.value.winnerId),
+);
 const confirmationSession = ref(null);
 const editedNames = ref([]);
 const busy = ref(false);
@@ -81,8 +116,14 @@ function openDialog(type) {
   dialog.value = type;
 }
 function closeDialog() {
+  if (dialog.value === "edit" && editing.value?.returnToDetail) {
+    editing.value = null;
+    dialog.value = "detail";
+    return;
+  }
   dialog.value = null;
-  detail.value = null;
+  detailId.value = null;
+  editing.value = null;
   confirmationSession.value = null;
 }
 async function begin(payload) {
@@ -120,6 +161,7 @@ async function confirmAction() {
       // 重建入座表单，同时重置尚未提交的姓名、座位和底注。
       setupEpoch.value++;
       view.value = "score";
+      dateFilter.value = { preset: "all", from: "", to: "" };
       closeDialog();
       notify("全部记录已清空，四位玩家姓名已初始化。");
     }
@@ -148,8 +190,39 @@ async function saveNames() {
   }
 }
 function showDetail(session) {
-  detail.value = session;
+  detailId.value = session.id;
+  detailPane.value = "rounds";
   dialog.value = "detail";
+}
+function openCorrection(session, round) {
+  if (working.value || locked.value) return;
+  editing.value = {
+    sessionId: session.id,
+    roundId: round.id,
+    number: round.number,
+    returnToDetail: dialog.value === "detail",
+  };
+  editKind.value = round.kind;
+  editWinner.value = round.winnerId || session.seats.east;
+  dialog.value = "edit";
+}
+async function saveCorrection() {
+  if (working.value || locked.value || !editChanged.value) return;
+  const target = editing.value;
+  if (
+    await transact((s) =>
+      correctRound(
+        s,
+        target.sessionId,
+        target.roundId,
+        editKind.value,
+        editKind.value === "draw" ? null : editWinner.value,
+      ),
+    )
+  ) {
+    closeDialog();
+    notify("这一局已修改，金额、结算和总账已重新计算并保存。");
+  }
 }
 const modalTitles = {
   reset: "清空全部记录？",
@@ -158,6 +231,7 @@ const modalTitles = {
   finish: "结束并保存本场？",
   draw: "记录本局流局？",
   detail: "本场明细",
+  edit: "修改这一局",
 };
 </script>
 
@@ -301,6 +375,7 @@ const modalTitles = {
               @undo="openDialog('undo')"
               @finish="openDialog('finish')"
               @draw="openDialog('draw')"
+              @edit="openCorrection"
             />
             <div v-else class="welcome-layout">
               <section class="panel welcome-panel">
@@ -381,10 +456,11 @@ const modalTitles = {
           <HistoryView
             v-else-if="view === 'history'"
             :state="state"
+            v-model:filter="dateFilter"
             @detail="showDetail"
             @go-score="view = 'score'"
           />
-          <StatsView v-else :state="state" :stats="stats" />
+          <StatsView v-else :state="state" v-model:filter="dateFilter" />
         </div>
         <footer class="page-footer">
           <span>四方账 <i>·</i> 只记输赢，轻松上桌</span
@@ -400,7 +476,7 @@ const modalTitles = {
       v-if="dialog"
       :title="
         dialog === 'detail'
-          ? `第 ${detail.number} 场 · 每局明细`
+          ? `第 ${detail.number} 场 · 明细与结算`
           : modalTitles[dialog]
       "
       :subtitle="
@@ -446,6 +522,17 @@ const modalTitles = {
           四人的本场金额会自动恢复到上一局之前。撤销后可以重新记下正确的结果。
         </p></template
       >
+      <RoundCorrection
+        v-else-if="dialog === 'edit' && editRound"
+        :session="editSession"
+        :round="editRound"
+        :number="editing.number"
+        :players="state.players"
+        v-model:kind="editKind"
+        v-model:winner="editWinner"
+        :disabled="locked || working"
+        @confirm="saveCorrection"
+      />
       <template v-else-if="dialog === 'draw'"
         ><p class="confirm-copy">
           将第
@@ -475,8 +562,9 @@ const modalTitles = {
             >
           </div>
         </div>
+        <SettlementList :scores="activeScores" :players="state.players" />
         <p class="help-note">
-          归档后可在历史中查看，无法继续记分或撤销。新的一场从零计分，总账继续累计。
+          归档后可查看结算或修改单局结果。新的一场从零计分，总账继续累计。
         </p></template
       >
       <template v-else-if="dialog === 'detail'"
@@ -492,8 +580,35 @@ const modalTitles = {
             >{{ seat.label }} · {{ namesById[detail.seats[seat.key]] }}</span
           >
         </div>
-        <RoundList :session="detail" :players="state.players"
-      /></template>
+        <div class="detail-tabs" role="group" aria-label="历史详情视图">
+          <button
+            :aria-pressed="detailPane === 'rounds'"
+            @click="detailPane = 'rounds'"
+          >
+            每局明细
+          </button>
+          <button
+            :aria-pressed="detailPane === 'settlement'"
+            @click="detailPane = 'settlement'"
+          >
+            结算清单
+          </button>
+        </div>
+        <RoundList
+          v-if="detailPane === 'rounds'"
+          :session="detail"
+          :players="state.players"
+          editable
+          :disabled="locked || working"
+          @edit="openCorrection(detail, $event)"
+        />
+        <div v-else class="detail-settlement">
+          <SettlementList
+            :scores="sessionScores(detail)"
+            :players="state.players"
+          />
+        </div>
+      </template>
       <p v-if="error" class="form-error dialog-error" role="alert">
         {{ error }}
       </p>
@@ -507,6 +622,14 @@ const modalTitles = {
           :disabled="locked || saving"
         >
           保存姓名</button
+        ><button
+          v-else-if="dialog === 'edit'"
+          type="submit"
+          form="round-correction"
+          class="button primary"
+          :disabled="locked || working || !editChanged"
+        >
+          确认修改</button
         ><button
           v-else
           class="button"

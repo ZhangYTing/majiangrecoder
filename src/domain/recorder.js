@@ -96,11 +96,15 @@ function requireActive(state) {
   return state.active;
 }
 
-export function recordRound(state, kind, winnerId = null) {
-  const session = requireActive(state);
+function validateRoundResult(kind, winnerId) {
   if (!Object.hasOwn(KIND_LABELS, kind)) throw new Error("胡牌方式不正确。");
   if (kind === "draw" ? winnerId !== null : !PLAYER_IDS.includes(winnerId))
     throw new Error("请选择正确的胡牌玩家。");
+}
+
+export function recordRound(state, kind, winnerId = null) {
+  const session = requireActive(state);
+  validateRoundResult(kind, winnerId);
   const count = state.sessions.reduce(
     (sum, s) => sum + s.rounds.length,
     session.rounds.length,
@@ -125,6 +129,32 @@ export function undoRound(state) {
     ...state,
     active: { ...session, rounds: session.rounds.slice(0, -1) },
   };
+}
+
+export function correctRound(state, sessionId, roundId, kind, winnerId = null) {
+  validateRoundResult(kind, winnerId);
+  const active = state.active?.id === sessionId;
+  const session = active
+    ? state.active
+    : state.sessions.find((item) => item.id === sessionId);
+  if (!session) throw new Error("找不到要修改的场次。");
+  if (!session.rounds.some((round) => round.id === roundId))
+    throw new Error("找不到要修改的这一局。");
+  // 保留局号、时间、底注和座位，只替换结果；所有金额由记录重新计算。
+  const corrected = {
+    ...session,
+    rounds: session.rounds.map((round) =>
+      round.id === roundId ? { ...round, kind, winnerId } : round,
+    ),
+  };
+  return active
+    ? { ...state, active: corrected }
+    : {
+        ...state,
+        sessions: state.sessions.map((item) =>
+          item.id === sessionId ? corrected : item,
+        ),
+      };
 }
 
 export function finishSession(state) {
@@ -160,8 +190,10 @@ export function sessionScores(session) {
   return scores;
 }
 
-export function allStats(state) {
-  const sessions = [...state.sessions, ...(state.active ? [state.active] : [])];
+export function allStats(
+  state,
+  sessions = [...state.sessions, ...(state.active ? [state.active] : [])],
+) {
   return state.players.map((player) => {
     let netCents = 0,
       wins = 0,

@@ -1,12 +1,24 @@
 <script setup>
 import { computed } from "vue";
-import { money } from "../domain/recorder.js";
+import { allStats, money } from "../domain/recorder.js";
+import { filterSessions, resolveDateRange } from "../domain/date-range.js";
+import DateFilter from "./DateFilter.vue";
 import AppIcon from "./AppIcon.vue";
-const props = defineProps({ state: Object, stats: Array });
-const sessions = computed(() => [
-  ...props.state.sessions,
-  ...(props.state.active ? [props.state.active] : []),
-]);
+const props = defineProps({ state: Object, filter: Object });
+const emit = defineEmits(["update:filter"]);
+const sessions = computed(() =>
+  filterSessions(
+    [
+      ...props.state.sessions,
+      ...(props.state.active ? [props.state.active] : []),
+    ],
+    resolveDateRange(props.filter),
+  ),
+);
+const stats = computed(() => allStats(props.state, sessions.value));
+const scope = computed(() =>
+  props.filter.preset === "all" ? "累计" : "所选范围",
+);
 const rounds = computed(() =>
   sessions.value.reduce((total, s) => total + s.rounds.length, 0),
 );
@@ -20,24 +32,30 @@ const draws = computed(() =>
 
 <template>
   <div class="stats-view">
+    <DateFilter
+      :model-value="filter"
+      @update:model-value="emit('update:filter', $event)"
+    />
     <section class="panel totals-overview">
       <div>
-        <div class="eyebrow">累计成绩</div>
+        <div class="eyebrow">{{ scope }}成绩</div>
         <h2>四位牌友，一本总账</h2>
         <p class="muted">
           {{
-            state.active ? "已计入当前进行中的场次。" : "汇总全部已结束场次。"
+            sessions.some((session) => !session.endedAt)
+              ? "已计入范围内进行中的场次。"
+              : "汇总范围内已结束场次。"
           }}改名字、换座位都不影响累计。
         </p>
       </div>
       <div class="overview-numbers">
         <div>
           <strong>{{ sessions.length }}</strong
-          ><span>累计场次</span>
+          ><span>{{ scope }}场次</span>
         </div>
         <div>
           <strong>{{ rounds }}</strong
-          ><span>累计局数</span>
+          ><span>{{ scope }}局数</span>
         </div>
         <div>
           <strong>{{ draws }}</strong
@@ -62,7 +80,7 @@ const draws = computed(() =>
           <span class="player-index">0{{ i + 1 }}</span>
         </header>
         <div class="stat-net">
-          <span>累计净输赢</span
+          <span>{{ scope }}净输赢</span
           ><strong
             :class="{
               positive: player.netCents > 0,

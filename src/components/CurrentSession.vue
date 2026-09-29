@@ -11,7 +11,7 @@ const props = defineProps({
   disabled: Boolean,
   busy: Boolean,
 });
-const emit = defineEmits(["record", "undo", "finish", "draw"]);
+const emit = defineEmits(["record", "undo", "finish", "draw", "edit"]);
 const winner = ref(null);
 const kind = ref("discard");
 const pane = ref("table");
@@ -24,7 +24,7 @@ const paid = computed(
   () => props.session.baseCents * (kind.value === "self" ? 2 : 1),
 );
 watch(
-  () => props.session.rounds.length,
+  () => props.session.rounds,
   () => {
     winner.value = null;
   },
@@ -188,7 +188,14 @@ watch(
         </div>
         <span class="muted tiny">最近的局在前</span>
       </header>
-      <RoundList :session="session" :players="players" fit-container />
+      <RoundList
+        :session="session"
+        :players="players"
+        fit-container
+        editable
+        :disabled="disabled || busy"
+        @edit="emit('edit', session, $event)"
+      />
     </section>
   </div>
 </template>

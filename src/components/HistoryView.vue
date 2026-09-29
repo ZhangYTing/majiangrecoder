@@ -1,29 +1,49 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { money, sessionScores } from "../domain/recorder.js";
 import { dateTime, fullDate } from "../format.js";
 import AppIcon from "./AppIcon.vue";
+import DateFilter from "./DateFilter.vue";
+import { filterSessions, resolveDateRange } from "../domain/date-range.js";
 import { useGridPagination } from "../composables/useGridPagination.js";
-const props = defineProps({ state: Object });
-const emit = defineEmits(["detail", "go-score"]);
+const props = defineProps({ state: Object, filter: Object });
+const emit = defineEmits(["detail", "go-score", "update:filter"]);
+const filtered = computed(() =>
+  filterSessions(
+    props.state.sessions.map((session, index) => ({
+      ...session,
+      number: index + 1,
+    })),
+    resolveDateRange(props.filter),
+  ),
+);
 const grid = ref(null);
 const { page, pageSize } = useGridPagination(
   grid,
-  computed(() => props.state.sessions.length),
+  computed(() => filtered.value.length),
 );
 const pages = computed(() =>
-  Math.max(1, Math.ceil(props.state.sessions.length / pageSize.value)),
+  Math.max(1, Math.ceil(filtered.value.length / pageSize.value)),
 );
 const sessions = computed(() =>
-  props.state.sessions
-    .map((s, i) => ({ ...s, number: i + 1 }))
+  [...filtered.value]
     .reverse()
     .slice(page.value * pageSize.value, (page.value + 1) * pageSize.value),
+);
+watch(
+  () => props.filter,
+  () => {
+    page.value = 0;
+  },
 );
 </script>
 
 <template>
   <div class="history-view">
+    <DateFilter
+      :model-value="filter"
+      @update:model-value="emit('update:filter', $event)"
+    />
     <div v-if="!state.sessions.length" class="panel empty-page">
       <div class="empty-illustration" aria-hidden="true">
         <AppIcon name="history" :size="42" />
@@ -36,9 +56,24 @@ const sessions = computed(() =>
         {{ state.active ? "回到当前场" : "开始第一场" }}<AppIcon name="arrow" />
       </button>
     </div>
+    <div v-else-if="!filtered.length" class="panel empty-page">
+      <div class="empty-illustration">
+        <AppIcon name="history" :size="42" />
+      </div>
+      <h2>这个日期范围没有场次</h2>
+      <p>可以调整日期，或选择全部查看已有记录。</p>
+      <button
+        class="button primary"
+        @click="emit('update:filter', { preset: 'all', from: '', to: '' })"
+      >
+        查看全部历史
+      </button>
+    </div>
     <template v-else>
       <div class="history-summary">
-        <span>共 {{ state.sessions.length }} 场已结束</span
+        <span
+          >所选 {{ filtered.length }} 场 · 全部
+          {{ state.sessions.length }} 场已结束</span
         ><span class="muted">按结束顺序，最近的场次在前</span>
       </div>
       <div ref="grid" class="history-grid">
@@ -81,7 +116,7 @@ const sessions = computed(() =>
             </div>
           </div>
           <div class="history-card-footer">
-            查看每局明细<AppIcon name="arrow" :size="17" />
+            查看明细与结算<AppIcon name="arrow" :size="17" />
           </div>
         </button>
       </div>

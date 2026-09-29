@@ -15,7 +15,10 @@ const props = defineProps({
   session: Object,
   players: Array,
   fitContainer: { type: Boolean, default: true },
+  editable: Boolean,
+  disabled: Boolean,
 });
+const emit = defineEmits(["edit"]);
 const container = ref(null);
 const pageSize = ref(20);
 const page = ref(0);
@@ -126,9 +129,20 @@ const name = (id) => props.players.find((p) => p.id === id)?.name || "";
               }}</strong
               ><span>{{ dateTime(round.at, true) }}</span>
             </div>
-            <span class="kind-badge" :class="round.kind">{{
-              KIND_LABELS[round.kind]
-            }}</span>
+            <div class="round-tools">
+              <span class="kind-badge" :class="round.kind">{{
+                KIND_LABELS[round.kind]
+              }}</span>
+              <button
+                v-if="editable"
+                class="round-edit-button"
+                :disabled="disabled"
+                :aria-label="`修改第${round.number}局`"
+                @click="emit('edit', round)"
+              >
+                修改
+              </button>
+            </div>
           </div>
           <div class="round-deltas">
             <div v-for="seat in SEATS" :key="seat.key">
