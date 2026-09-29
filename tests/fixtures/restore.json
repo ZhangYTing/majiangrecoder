@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "players": [
+    {
+      "id": "p1",
+      "name": "备份一"
+    },
+    {
+      "id": "p2",
+      "name": "备份二"
+    },
+    {
+      "id": "p3",
+      "name": "备份三"
+    },
+    {
+      "id": "p4",
+      "name": "备份四"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "6f1c90d3-d275-4e58-af73-5f86d14db9c1",
+      "startedAt": "2026-09-29T03:08:38.154Z",
+      "endedAt": "2026-09-29T03:08:38.155Z",
+      "seats": {
+        "east": "p1",
+        "south": "p2",
+        "west": "p3",
+        "north": "p4"
+      },
+      "baseCents": 100,
+      "rounds": [
+        {
+          "id": "b150ee12-ac9d-4260-a89f-9382048bca6b",
+          "at": "2026-09-29T03:08:38.155Z",
+          "kind": "self",
+          "winnerId": "p4"
+        }
+      ]
+    }
+  ],
+  "active": {
+    "id": "ef2e1cbc-f2ff-482e-842f-3f3b459ba9d7",
+    "startedAt": "2026-09-29T03:08:38.155Z",
+    "endedAt": null,
+    "seats": {
+      "east": "p1",
+      "south": "p2",
+      "west": "p3",
+      "north": "p4"
+    },
+    "baseCents": 100,
+    "rounds": [
+      {
+        "id": "3b5ad1d0-b151-4871-971e-1d725e224dbd",
+        "at": "2026-09-29T03:08:38.155Z",
+        "kind": "discard",
+        "winnerId": "p3"
+      }
+    ]
+  }
+}
