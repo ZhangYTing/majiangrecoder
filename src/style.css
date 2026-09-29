@@ -3210,6 +3210,81 @@ body,
     grid-template-rows: minmax(0, 1fr);
   }
 }
+.page-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.page-heading-actions .play-rules-button {
+  padding: 8px 12px;
+  min-height: 38px;
+  font-size: 13px;
+}
+.play-rules-dialog {
+  width: min(780px, calc(100vw - 32px));
+}
+.play-rules-dialog .play-rules-tabs {
+  display: none;
+}
+.play-rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.play-rules-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.play-rules-list h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.play-rules-list p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #527062;
+}
+@media (max-width: 760px) {
+  .page-heading-actions {
+    gap: 0;
+  }
+  .page-heading-actions .play-rules-button {
+    padding: 7px 9px;
+    min-height: 34px;
+    font-size: 12px;
+  }
+  .play-rules-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .play-rules-dialog .play-rules-tabs {
+    display: flex;
+  }
+  .play-rules-list .rule-hidden-mobile {
+    display: none;
+  }
+  .play-rules-list li {
+    gap: 8px;
+  }
+}
+@media (min-width: 761px) and (max-height: 720px) {
+  .play-rules-dialog .dialog-header,
+  .play-rules-dialog .dialog-body {
+    padding: 16px;
+  }
+  .play-rules-dialog .dialog-footer {
+    padding: 12px 16px;
+  }
+  .play-rules-dialog .play-rules-list {
+    gap: 10px;
+  }
+}
 .date-filter {
   flex: 0 0 auto;
   min-width: 0;

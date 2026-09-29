@@ -34,6 +34,7 @@ function reloadPage() {
   window.location.reload();
 }
 const dialog = ref(null);
+const rulesSection = ref("hand");
 const dateFilter = ref({ preset: "all", from: "", to: "" });
 const detailId = ref(null);
 const detailPane = ref("rounds");
@@ -100,6 +101,42 @@ const headings = {
   history: ["场次历史", "每一场的输赢，都有据可查。"],
   stats: ["四人总账", "从第一局开始，记下每一次输赢。"],
 };
+// 仅用于展示本地玩法，不参与胡牌判断、庄家管理或金额计算。
+const playRules = [
+  {
+    title: "四人入座 · 108 张数牌",
+    description:
+      "四位玩家坐东、南、西、北，一场内不换座位。只有筒、万、条，共 108 张；没有风牌、箭牌和花牌，每局只有一人可以胡牌。",
+  },
+  {
+    title: "胡牌条件 · 一种花色至少 9 张",
+    description:
+      "胡牌时，筒、万、条中某一种花色必须至少有 9 张。另五张牌花色不限。",
+  },
+  {
+    title: "行牌规则 · 只能碰，不能吃",
+    description: "全局不能吃牌，只能碰牌。",
+  },
+  {
+    title: "点炮胡 · 三家各付一份",
+    description:
+      "另外三人各支付一份底注。底注 1 元时，胡牌者赢 3 元，另外三人各付 1 元。",
+  },
+  {
+    title: "自摸 · 三家各付两份",
+    description:
+      "另外三人各支付两份底注。底注 1 元时，胡牌者赢 6 元，另外三人各付 2 元。",
+  },
+  {
+    title: "开始抢庄 · 掷骰比点数",
+    description: "刚开始玩时，四位玩家掷骰子抢庄，骰子点数最大者成为庄家。",
+  },
+  {
+    title: "庄家胡牌 · 保庄",
+    description:
+      "如果本局庄家胡牌，就保庄：下一局继续由该玩家做庄家，并继续掷骰子。",
+  },
+];
 
 function notify(text) {
   toast.value = text;
@@ -109,6 +146,7 @@ function notify(text) {
   }, 3500);
 }
 function openDialog(type) {
+  if (type === "rules") rulesSection.value = "hand";
   if (["undo", "finish", "draw"].includes(type))
     confirmationSession.value = state.value.active;
   if (type === "names")
@@ -232,6 +270,7 @@ const modalTitles = {
   draw: "记录本局流局？",
   detail: "本场明细",
   edit: "修改这一局",
+  rules: "本地玩法介绍",
 };
 </script>
 
@@ -327,7 +366,15 @@ const modalTitles = {
             <h1>{{ headings[view][0] }}</h1>
             <p>{{ headings[view][1] }}</p>
           </div>
-          <span class="today-date">{{ fullDate(new Date()) }}</span>
+          <div class="page-heading-actions">
+            <span class="today-date">{{ fullDate(new Date()) }}</span>
+            <button
+              class="button secondary play-rules-button"
+              @click="openDialog('rules')"
+            >
+              <AppIcon name="info" :size="16" />玩法介绍
+            </button>
+          </div>
         </div>
         <div
           class="page-body"
@@ -431,7 +478,8 @@ const modalTitles = {
                     </div>
                   </div>
                   <div class="rules-footnote">
-                    108 张数牌 · 无杠牌、庄家额外奖励
+                    一种花色至少 9 张 · 只能碰，不能吃<br />
+                    掷骰抢庄 · 庄家胡牌保庄 · 无杠牌、庄家额外奖励
                   </div>
                 </section>
                 <section class="little-summary">
@@ -474,6 +522,7 @@ const modalTitles = {
     </div>
     <AppDialog
       v-if="dialog"
+      :class="{ 'play-rules-dialog': dialog === 'rules' }"
       :title="
         dialog === 'detail'
           ? `第 ${detail.number} 场 · 明细与结算`
@@ -487,7 +536,50 @@ const modalTitles = {
       :wide="dialog === 'detail'"
       @close="closeDialog"
     >
-      <template v-if="dialog === 'names'"
+      <template v-if="dialog === 'rules'">
+        <div
+          class="play-rules-tabs detail-tabs"
+          role="group"
+          aria-label="玩法介绍分类"
+        >
+          <button
+            :aria-pressed="rulesSection === 'hand'"
+            @click="rulesSection = 'hand'"
+          >
+            牌张与胡牌
+          </button>
+          <button
+            :aria-pressed="rulesSection === 'scoring'"
+            @click="rulesSection = 'scoring'"
+          >
+            计分与庄家
+          </button>
+        </div>
+        <ol class="play-rules-list">
+          <li
+            v-for="(rule, index) in playRules"
+            :key="rule.title"
+            :class="{
+              'rule-hidden-mobile':
+                index < 3
+                  ? rulesSection !== 'hand'
+                  : rulesSection !== 'scoring',
+            }"
+          >
+            <span class="rule-number">{{
+              String(index + 1).padStart(2, "0")
+            }}</span>
+            <div>
+              <h3>{{ rule.title }}</h3>
+              <p>{{ rule.description }}</p>
+            </div>
+          </li>
+        </ol>
+        <p class="help-note">
+          杠牌和庄家没有单独的金额奖励，自摸金额为点炮的两倍。
+        </p>
+      </template>
+      <template v-else-if="dialog === 'names'"
         ><form id="player-names" @submit.prevent="saveNames">
           <div class="name-input-grid">
             <label v-for="(player, i) in state.players" :key="player.id"
@@ -612,7 +704,10 @@ const modalTitles = {
       <p v-if="error" class="form-error dialog-error" role="alert">
         {{ error }}
       </p>
-      <template v-if="dialog !== 'detail'" #footer
+      <template v-if="dialog === 'rules'" #footer>
+        <button class="button primary" @click="closeDialog">我知道了</button>
+      </template>
+      <template v-else-if="dialog !== 'detail'" #footer
         ><button class="button secondary" @click="closeDialog">取消</button
         ><button
           v-if="dialog === 'names'"
